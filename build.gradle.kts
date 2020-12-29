@@ -25,6 +25,11 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     implementation("com.zaxxer:HikariCP:3.4.3")
     implementation("mysql:mysql-connector-java:8.0.17")
+    implementation("org.modelmapper:modelmapper:2.3.0")
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("io.jsonwebtoken:jjwt-api:0.11.1")
+    implementation("io.jsonwebtoken:jjwt-impl:0.11.1")
+    implementation("io.jsonwebtoken:jjwt-gson:0.11.1")
 }
 
 tasks.withType<KotlinCompile> {
