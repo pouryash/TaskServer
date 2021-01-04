@@ -1,4 +1,4 @@
-package com.example.demo.userApi
+package com.example.demo.repository
 
 import com.example.demo.Dbmodel.User
 import org.springframework.data.jpa.repository.JpaRepository

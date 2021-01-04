@@ -1,14 +1,17 @@
-package com.example.demo.userApi
+package com.example.demo.controller
 
 import com.example.demo.model.ResponseModel
 import com.example.demo.Dbmodel.User
 import com.example.demo.model.UserDTO
 import com.example.demo.model.UserToken
+import com.example.demo.repository.UserRepo
+import com.example.demo.service.UserServic
 import com.example.demo.utils.DateUtils
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import java.util.*
 
 
 @RestController
@@ -45,7 +48,7 @@ class UserController(private val userRepository: UserRepo) {
                 }
 
                 userDTO.token = userService.getJWTToken(userDTO)
-                userDTO.createDate = DateUtils.getCurrentDate()
+                userDTO.createDate = DateUtils.convertDateToString(Date())
                 var user = userService.convertUserDtoToUserEntity(userDTO)
 
                 userRepository.save(user).let {

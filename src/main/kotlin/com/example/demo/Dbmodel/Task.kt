@@ -2,6 +2,7 @@ package com.example.demo.Dbmodel
 
 import com.example.demo.model.Priority
 import com.example.demo.model.Status
+import java.util.*
 import javax.persistence.Entity
 import javax.persistence.Id
 
@@ -14,7 +15,7 @@ data class Task(
         val priority: String = Priority.Low.name,
         val status: String = Status.ToDo.name,
         val loggedTime: String = "",
-        val createDate: String = "",
+        val createDate: Date,
         val endDate: String = ""
 
 )

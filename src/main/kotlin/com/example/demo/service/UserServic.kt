@@ -1,4 +1,4 @@
-package com.example.demo.userApi
+package com.example.demo.service
 
 import com.example.demo.Dbmodel.User
 import com.example.demo.model.UserDTO
