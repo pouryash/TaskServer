@@ -1,22 +1,22 @@
-package com.example.demo.UserApi
+package com.example.demo.userApi
 
 import com.example.demo.model.ResponseModel
 import com.example.demo.Dbmodel.User
 import com.example.demo.model.UserDTO
+import com.example.demo.model.UserToken
 import com.example.demo.utils.DateUtils
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 
 @RestController
 @RequestMapping("/")
-class UserController(private val userRepository: UserRepository) {
+class UserController(private val userRepository: UserRepo) {
 
     @Autowired
-    lateinit var userService: UserService
+    lateinit var userService: UserServic
 
 
     @GetMapping("/users")
@@ -55,7 +55,7 @@ class UserController(private val userRepository: UserRepository) {
                     ResponseModel(
                         HttpStatus.OK.value(),
                         HttpStatus.OK.reasonPhrase,
-                        userDTO.token
+                        UserToken(token = user.token, userName = user.userName, role = user.role)
                     ), HttpStatus.OK
                 )
             }
@@ -79,17 +79,15 @@ class UserController(private val userRepository: UserRepository) {
 
 
     @PostMapping(
-        "/userLogin",
-        consumes = [MediaType.APPLICATION_FORM_URLENCODED_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE],
-        produces = [MediaType.APPLICATION_JSON_VALUE]
+        "/userLogin"
     )
-    fun userLogin(@ModelAttribute userDTO: UserDTO): ResponseEntity<ResponseModel> {
+    fun userLogin(@RequestBody userDTO: UserDTO): ResponseEntity<ResponseModel> {
          userRepository.findByUserNameAndPassword(userDTO.userName, userDTO.password)?.let { user ->
-           return ResponseEntity(
+             return ResponseEntity(
                 ResponseModel(
                     HttpStatus.OK.value(),
                     HttpStatus.OK.reasonPhrase,
-                    user.token
+                    UserToken(token = user.token, userName = user.userName, role = user.role)
                 ), HttpStatus.OK
             )
         }
@@ -114,7 +112,7 @@ class UserController(private val userRepository: UserRepository) {
                 val updatedUserEntity: User =
                     existingUser.copy(
                         userName = userDTO.userName, email = userDTO.email,
-                        password = userDTO.password, createDate = DateUtils.getCurrentDate()
+                        password = userDTO.password
                     )
                 userRepository.save(updatedUserEntity)
                 return ResponseEntity(

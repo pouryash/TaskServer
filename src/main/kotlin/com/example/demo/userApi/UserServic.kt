@@ -1,4 +1,4 @@
-package com.example.demo.UserApi
+package com.example.demo.userApi
 
 import com.example.demo.Dbmodel.User
 import com.example.demo.model.UserDTO
@@ -11,7 +11,7 @@ import java.util.*
 import java.util.stream.Collectors
 
 @Service
-class UserService {
+class UserServic {
 
     fun convertUserEntityListToUserDtoList(userList: List<User>) : List<UserDTO>{
         return userList.map {
