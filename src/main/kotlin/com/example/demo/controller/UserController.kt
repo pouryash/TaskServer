@@ -1,75 +1,29 @@
 package com.example.demo.controller
 
 import com.example.demo.model.ResponseModel
-import com.example.demo.Dbmodel.User
 import com.example.demo.model.UserDTO
-import com.example.demo.model.UserToken
-import com.example.demo.repository.UserRepo
 import com.example.demo.service.UserServic
-import com.example.demo.utils.DateUtils
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import java.util.*
 
 
 @RestController
 @RequestMapping("/")
-class UserController(private val userRepository: UserRepo) {
+class UserController() {
 
     @Autowired
     lateinit var userService: UserServic
 
 
     @GetMapping("/users")
-    fun getAllUsers(): ResponseEntity<ResponseModel> {
-        return ResponseEntity(
-            ResponseModel(
-                HttpStatus.OK.value(),
-                HttpStatus.OK.reasonPhrase,
-                userService.convertUserEntityListToUserDtoList(userRepository.findAll())
-            ), HttpStatus.OK
-        )
+    fun getAllUsers(@RequestHeader Authorization: String): ResponseEntity<ResponseModel> {
+        return userService.getAllUsers(Authorization)
     }
 
     @PostMapping("/createUsers")
     fun createNewUser(@RequestBody userDTO: UserDTO?): ResponseEntity<ResponseModel> {
-        userDTO?.let {
-            if (userDTO.userName.isNotEmpty() && userDTO.password.isNotEmpty() && userDTO.email.isNotEmpty()) {
-
-                userRepository.findByEmail(userDTO.email)?.let {
-                    return ResponseEntity(
-                        ResponseModel(
-                            HttpStatus.CONFLICT.value(),
-                            HttpStatus.CONFLICT.reasonPhrase
-                        ), HttpStatus.CONFLICT
-                    )
-                }
-
-                userDTO.token = userService.getJWTToken(userDTO)
-                userDTO.createDate = DateUtils.convertDateToString(Date())
-                var user = userService.convertUserDtoToUserEntity(userDTO)
-
-                userRepository.save(user).let {
-                    userDTO.id = user.id
-                }
-                return ResponseEntity(
-                    ResponseModel(
-                        HttpStatus.OK.value(),
-                        HttpStatus.OK.reasonPhrase,
-                        UserToken(token = user.token, userName = user.userName, role = user.role)
-                    ), HttpStatus.OK
-                )
-            }
-        }
-
-        return ResponseEntity(
-            ResponseModel(
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.reasonPhrase,
-            ), HttpStatus.BAD_REQUEST
-        )
+        return userService.createNewUser(userDTO)
 
     }
 
@@ -85,22 +39,7 @@ class UserController(private val userRepository: UserRepo) {
         "/userLogin"
     )
     fun userLogin(@RequestBody userDTO: UserDTO): ResponseEntity<ResponseModel> {
-         userRepository.findByUserNameAndPassword(userDTO.userName, userDTO.password)?.let { user ->
-             return ResponseEntity(
-                ResponseModel(
-                    HttpStatus.OK.value(),
-                    HttpStatus.OK.reasonPhrase,
-                    UserToken(token = user.token, userName = user.userName, role = user.role)
-                ), HttpStatus.OK
-            )
-        }
-
-       return ResponseEntity(
-            ResponseModel(
-                HttpStatus.NOT_FOUND.value(),
-                "User not found"
-            ), HttpStatus.NOT_FOUND
-        )
+         return userService.userLogin(userDTO)
 
     }
 
@@ -109,36 +48,7 @@ class UserController(private val userRepository: UserRepo) {
         @RequestHeader Authorization: String,
         @RequestBody userDTO: UserDTO
     ): ResponseEntity<ResponseModel> {
-        if (userDTO.userName.isNotEmpty() && userDTO.password.isNotEmpty() && userDTO.email.isNotEmpty()) {
-
-            userRepository.findByToken(Authorization)?.let { existingUser ->
-                val updatedUserEntity: User =
-                    existingUser.copy(
-                        userName = userDTO.userName, email = userDTO.email,
-                        password = userDTO.password
-                    )
-                userRepository.save(updatedUserEntity)
-                return ResponseEntity(
-                    ResponseModel(
-                        HttpStatus.OK.value(),
-                        HttpStatus.OK.reasonPhrase
-                    ), HttpStatus.OK
-                )
-            }
-            return ResponseEntity(
-                ResponseModel(
-                    HttpStatus.NOT_FOUND.value(),
-                    "User not found"
-                ), HttpStatus.NOT_FOUND
-            )
-
-        }
-        return ResponseEntity(
-            ResponseModel(
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.reasonPhrase,
-            ), HttpStatus.BAD_REQUEST
-        )
+      return userService.updateUser(Authorization, userDTO)
     }
 
 

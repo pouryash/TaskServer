@@ -1,23 +1,117 @@
 package com.example.demo.service
 
 import com.example.demo.Dbmodel.Task
-import com.example.demo.model.Priority
-import com.example.demo.model.ResponseModel
-import com.example.demo.model.Status
-import com.example.demo.model.TaskDto
+import com.example.demo.Dbmodel.UserTask
+import com.example.demo.model.*
 import com.example.demo.repository.TaskRepository
 import com.example.demo.repository.UserRepo
+import com.example.demo.repository.UserTaskDetailRepo
+import com.example.demo.repository.UserTaskRepo
 import com.example.demo.utils.DateUtils
+import org.hibernate.jpa.QueryHints
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Service
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import java.util.*
+import kotlin.collections.ArrayList
+import javax.persistence.EntityManagerFactory
+import javax.persistence.EntityManager
+import javax.persistence.Query
+import org.modelmapper.ModelMapper
+import org.springframework.context.annotation.Bean
+
 
 @Service
-class TaskService(private val taskRepository: TaskRepository, private var userRepo: UserRepo) {
+class TaskService(
+    private val taskRepository: TaskRepository, private var userRepo: UserRepo,
+    private var userTaskRepo: UserTaskRepo
+) : UserTaskDetailRepo {
+
+    @Autowired
+    lateinit var emf: EntityManagerFactory
 
 
-    fun getAllTasksBetweenDate(Authorization: String, fromDate: String, toDate: String ): ResponseEntity<ResponseModel> {
+    override fun filterTAsks(filterModel: FilterModel): ResponseEntity<ResponseModel> {
+
+        var dateFilter: String = ""
+        var statusFilter: String = ""
+        var priorityFilter: String = ""
+        var endDateFilter: String = ""
+        var userFilter: String = ""
+        val fildes =
+            "T.id, T.taskName, T.description, T.reporter, T.priority, T.status, T.loggedTime, T.createDate, T.endDate, U.userName, U.email"
+
+        if (filterModel.status != "" && getValidStatus(filterModel.status) != "") {
+            statusFilter += "And T.status = '${getValidStatus(filterModel.status)}'"
+        }
+        if (filterModel.priority != "" && getValidPriority(filterModel.priority) != "") {
+            priorityFilter += "And T.priority = '${getValidPriority(filterModel.priority)}'"
+        }
+        if (filterModel.fromDate != "" && filterModel.toDate != "") {
+            dateFilter += "And T.createDate between '${filterModel.fromDate}' and '${filterModel.toDate}'"
+        }
+        if (filterModel.isEnded) {
+            endDateFilter += "And T.endDate IS NOT NULL"
+        }
+        if (filterModel.userId != -1L) {
+            userFilter += "And U.id = '${filterModel.userId}'"
+        }
+
+        val em = emf.createEntityManager()
+
+        val query: Query = em.createQuery(
+            "SELECT $fildes FROM User U INNER JOIN UserTask B ON U.id = B.userId INNER JOIN Task T ON B.taskId = T.id And T.isDeleted != 1" +
+                    " $dateFilter $statusFilter $priorityFilter $endDateFilter $userFilter "
+        )
+        val list = query.resultList
+        em.close()
+
+        return return ResponseEntity(
+            ResponseModel(
+                HttpStatus.OK.value(),
+                HttpStatus.OK.reasonPhrase,
+                list
+            ), HttpStatus.OK
+        )
+
+    }
+
+    fun getUserTasksById(userId: Long): ResponseEntity<ResponseModel> {
+
+        return ResponseEntity(
+            ResponseModel(
+                HttpStatus.OK.value(),
+                HttpStatus.OK.reasonPhrase,
+                taskRepository.findUserTasks(userId)
+            ), HttpStatus.OK
+        )
+    }
+
+    fun getUserTasksByToken(Authorization: String): ResponseEntity<ResponseModel> {
+        userRepo.findByToken(Authorization)?.let {
+            return ResponseEntity(
+                ResponseModel(
+                    HttpStatus.OK.value(),
+                    HttpStatus.OK.reasonPhrase,
+                    taskRepository.findUserTasks(it.id)
+                ), HttpStatus.OK
+            )
+        }
+
+        return ResponseEntity(
+            ResponseModel(
+                HttpStatus.NOT_FOUND.value(),
+                "User not found"
+            ), HttpStatus.NOT_FOUND
+        )
+
+    }
+
+
+    fun getAllTasksBetweenDate(Authorization: String, fromDate: String, toDate: String): ResponseEntity<ResponseModel> {
 
         if (fromDate.isNotEmpty() && toDate.isNotEmpty()) {
 
@@ -84,11 +178,14 @@ class TaskService(private val taskRepository: TaskRepository, private var userRe
 
     }
 
+
     fun createNewTask(taskDto: TaskDto?): ResponseEntity<ResponseModel> {
 
         taskDto?.let {
 
-            if (taskDto.taskName.isNotEmpty() && taskDto.priority.isNotEmpty() && taskDto.reporter.isNotEmpty()) {
+            if (taskDto.taskName.isNotEmpty() && taskDto.priority.isNotEmpty()
+                && taskDto.reporter.isNotEmpty() && taskDto.userId != -1L
+            ) {
 
                 taskRepository.findByTaskName(taskDto.taskName)?.let {
                     return ResponseEntity(
@@ -114,16 +211,17 @@ class TaskService(private val taskRepository: TaskRepository, private var userRe
                 taskDto.createDate = DateUtils.convertDateToString(Date())
                 taskDto.endDate = ""
                 taskDto.id = 0
-                var task = convertTaskDtoToTask(taskDto)
 
-                taskRepository.save(task).let {
-                    taskDto.id = task.id
-                }
+                taskRepository.save(convertTaskDtoToTask(taskDto))
+
+                var newTaskDto = convertTaskToTaskDto(taskRepository.findByTaskName(taskDto.taskName)!!)
+
+                userTaskRepo.save(UserTask(userId = taskDto.userId, taskId = newTaskDto.id))
                 return ResponseEntity(
                     ResponseModel(
                         HttpStatus.OK.value(),
                         HttpStatus.OK.reasonPhrase,
-                        taskDto
+                        newTaskDto.copy(userId = taskDto.userId)
                     ), HttpStatus.OK
                 )
             }
@@ -151,7 +249,7 @@ class TaskService(private val taskRepository: TaskRepository, private var userRe
                     if (taskDto.status.equals(Status.Done.name, ignoreCase = true))
                         taskDto.endDate = DateUtils.convertDateToString(Date())
                     else
-                        taskDto.endDate = ""
+                        taskDto.endDate = DateUtils.convertDateToString(existingTask.endDate)
 
                     val validLog = getValidLoggedTime(taskDto.loggedTime, existingTask.loggedTime)
                     if (validLog.isNotEmpty())
@@ -167,14 +265,16 @@ class TaskService(private val taskRepository: TaskRepository, private var userRe
                     val updatedTaskEntity: Task =
                         existingTask.copy(
                             taskName = taskDto.taskName, status = getValidStatus(taskDto.status),
-                            priority = getValidPriority(taskDto.priority), endDate = taskDto.endDate,
-                            loggedTime = taskDto.loggedTime
+                            priority = getValidPriority(taskDto.priority),
+                            endDate = DateUtils.convertStringToDate(taskDto.endDate),
+                            loggedTime = taskDto.loggedTime, description = taskDto.description
                         )
                     taskRepository.save(updatedTaskEntity)
                     return ResponseEntity(
                         ResponseModel(
                             HttpStatus.OK.value(),
-                            HttpStatus.OK.reasonPhrase
+                            HttpStatus.OK.reasonPhrase,
+                            convertTaskToTaskDto(updatedTaskEntity)
                         ), HttpStatus.OK
                     )
                 }
@@ -216,7 +316,8 @@ class TaskService(private val taskRepository: TaskRepository, private var userRe
                         ), HttpStatus.FORBIDDEN
                     )
                 taskRepository.findByTaskName(name)?.let {
-                    taskRepository.delete(it)
+//                    taskRepository.delete(it)
+                    taskRepository.save(it.copy(isDeleted = 1))
                     return ResponseEntity(
                         ResponseModel(
                             HttpStatus.OK.value(),
@@ -253,9 +354,10 @@ class TaskService(private val taskRepository: TaskRepository, private var userRe
         return TaskDto(
             id = task.id,
             taskName = task.taskName,
+            description = task.description,
             priority = task.priority,
             createDate = DateUtils.convertDateToString(task.createDate),
-            endDate = task.endDate,
+            endDate = DateUtils.convertDateToString(task.endDate),
             reporter = task.reporter,
             status = task.status,
             loggedTime = task.loggedTime
@@ -272,9 +374,10 @@ class TaskService(private val taskRepository: TaskRepository, private var userRe
         return Task(
             id = taskDto.id,
             taskName = taskDto.taskName,
+            description = taskDto.description,
             priority = taskDto.priority,
-            createDate = DateUtils.convertStringToDate(taskDto.createDate),
-            endDate = taskDto.endDate,
+            createDate = DateUtils.convertStringToDate(taskDto.createDate)!!,
+            endDate = DateUtils.convertStringToDate(taskDto.endDate),
             reporter = taskDto.reporter,
             status = taskDto.status,
             loggedTime = taskDto.loggedTime
@@ -373,4 +476,5 @@ class TaskService(private val taskRepository: TaskRepository, private var userRe
         }
         return true
     }
+
 }

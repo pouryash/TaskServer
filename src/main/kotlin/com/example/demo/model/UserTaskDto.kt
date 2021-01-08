@@ -1,7 +1,7 @@
 package com.example.demo.model
 
 
-data class TaskDto(
+data class UserTaskDto(
         var id: Long = 0,
         val taskName: String = "",
         val description: String = "",
@@ -11,6 +11,7 @@ data class TaskDto(
         var loggedTime: String = "",
         var createDate: String = "",
         var endDate: String = "",
-        var userId: Long = -1
+        val userName: String = "",
+        val email: String = "",
 
 )

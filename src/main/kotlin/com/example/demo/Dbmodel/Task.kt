@@ -11,11 +11,13 @@ data class Task(
         @Id
         val id: Long = 0,
         val taskName: String = "",
+        val description: String = "",
         val reporter: String = "",
         val priority: String = Priority.Low.name,
         val status: String = Status.ToDo.name,
         val loggedTime: String = "",
         val createDate: Date,
-        val endDate: String = ""
+        val endDate: Date? = null,
+        val isDeleted: Int = 0
 
 )

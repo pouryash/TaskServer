@@ -1,9 +1,15 @@
 package com.example.demo.service
 
 import com.example.demo.Dbmodel.User
+import com.example.demo.model.ResponseModel
 import com.example.demo.model.UserDTO
+import com.example.demo.model.UserToken
+import com.example.demo.repository.UserRepo
+import com.example.demo.utils.DateUtils
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.SignatureAlgorithm
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.authority.AuthorityUtils
 import org.springframework.stereotype.Service
@@ -11,28 +17,148 @@ import java.util.*
 import java.util.stream.Collectors
 
 @Service
-class UserServic {
+class UserServic(private val userRepository: UserRepo) {
 
-    fun convertUserEntityListToUserDtoList(userList: List<User>) : List<UserDTO>{
+    fun getAllUsers(Authorization: String): ResponseEntity<ResponseModel> {
+        userRepository.findByToken(Authorization)?.let {
+            if (it.role == "admin")
+                return ResponseEntity(
+                    ResponseModel(
+                        HttpStatus.OK.value(),
+                        HttpStatus.OK.reasonPhrase,
+                        convertUserEntityListToUserDtoList(userRepository.findAll())
+                    ), HttpStatus.OK
+                )
+        }
+        return ResponseEntity(
+            ResponseModel(
+                HttpStatus.NOT_FOUND.value(),
+                "User not found"
+            ), HttpStatus.NOT_FOUND
+        )
+
+    }
+
+
+    fun createNewUser(userDTO: UserDTO?): ResponseEntity<ResponseModel> {
+        userDTO?.let {
+            if (userDTO.userName.isNotEmpty() && userDTO.password.isNotEmpty() && userDTO.email.isNotEmpty()) {
+
+                userRepository.findByEmail(userDTO.email)?.let {
+                    return ResponseEntity(
+                        ResponseModel(
+                            HttpStatus.CONFLICT.value(),
+                            HttpStatus.CONFLICT.reasonPhrase
+                        ), HttpStatus.CONFLICT
+                    )
+                }
+
+                userDTO.token = getJWTToken(userDTO)
+                userDTO.createDate = DateUtils.convertDateToString(Date())
+                val user = convertUserDtoToUserEntity(userDTO)
+
+                userRepository.save(user).let {
+                    userDTO.id = user.id
+                }
+                return ResponseEntity(
+                    ResponseModel(
+                        HttpStatus.OK.value(),
+                        HttpStatus.OK.reasonPhrase,
+                        UserToken(token = user.token, userName = user.userName, role = user.role)
+                    ), HttpStatus.OK
+                )
+            }
+        }
+
+        return ResponseEntity(
+            ResponseModel(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.reasonPhrase,
+            ), HttpStatus.BAD_REQUEST
+        )
+
+    }
+
+
+    fun userLogin(userDTO: UserDTO): ResponseEntity<ResponseModel> {
+        userRepository.findByUserNameAndPassword(userDTO.userName, userDTO.password)?.let { user ->
+            return ResponseEntity(
+                ResponseModel(
+                    HttpStatus.OK.value(),
+                    HttpStatus.OK.reasonPhrase,
+                    UserToken(token = user.token, userName = user.userName, role = user.role)
+                ), HttpStatus.OK
+            )
+        }
+
+        return ResponseEntity(
+            ResponseModel(
+                HttpStatus.NOT_FOUND.value(),
+                "User not found"
+            ), HttpStatus.NOT_FOUND
+        )
+
+    }
+
+
+    fun updateUser(Authorization: String, userDTO: UserDTO): ResponseEntity<ResponseModel> {
+        if (userDTO.userName.isNotEmpty() && userDTO.password.isNotEmpty() && userDTO.email.isNotEmpty()) {
+
+            userRepository.findByToken(Authorization)?.let { existingUser ->
+                val updatedUserEntity: User =
+                    existingUser.copy(
+                        userName = userDTO.userName, email = userDTO.email,
+                        password = userDTO.password
+                    )
+                userRepository.save(updatedUserEntity)
+                return ResponseEntity(
+                    ResponseModel(
+                        HttpStatus.OK.value(),
+                        HttpStatus.OK.reasonPhrase
+                    ), HttpStatus.OK
+                )
+            }
+            return ResponseEntity(
+                ResponseModel(
+                    HttpStatus.NOT_FOUND.value(),
+                    "User not found"
+                ), HttpStatus.NOT_FOUND
+            )
+
+        }
+        return ResponseEntity(
+            ResponseModel(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.reasonPhrase,
+            ), HttpStatus.BAD_REQUEST
+        )
+    }
+
+
+    fun convertUserEntityListToUserDtoList(userList: List<User>): List<UserDTO> {
         return userList.map {
             convertUserEntityToUserDto(it)
         }
     }
 
-    fun convertUserEntityToUserDto(user: User) : UserDTO{
-        return UserDTO(id = user.id, userName = user.userName, password = user.password,
-            createDate = user.createDate, role = user.role, email = user.email)
+    fun convertUserEntityToUserDto(user: User): UserDTO {
+        return UserDTO(
+            id = user.id, userName = user.userName, password = user.password,
+            createDate = user.createDate, role = user.role, email = user.email
+        )
     }
 
-    fun convertUserDtoListToUserList(userDTOList: List<UserDTO>) : List<User>{
+    fun convertUserDtoListToUserList(userDTOList: List<UserDTO>): List<User> {
         return userDTOList.map {
             convertUserDtoToUserEntity(it)
         }
     }
 
-    fun convertUserDtoToUserEntity(userDTO: UserDTO) : User{
-        return User(id = userDTO.id, userName = userDTO.userName, password = userDTO.password,
-            createDate = userDTO.createDate, role = userDTO.role, email = userDTO.email, token = userDTO.token)
+    fun convertUserDtoToUserEntity(userDTO: UserDTO): User {
+        return User(
+            id = userDTO.id, userName = userDTO.userName, password = userDTO.password,
+            createDate = userDTO.createDate, role = userDTO.role, email = userDTO.email, token = userDTO.token
+        )
     }
 
     fun getJWTToken(userDTO: UserDTO): String {
