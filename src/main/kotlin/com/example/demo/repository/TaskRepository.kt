@@ -17,4 +17,16 @@ interface TaskRepository : JpaRepository<Task, Long>{
                 " FROM user A INNER JOIN user_task B ON B.user_id = :userId And A.id = B.user_id INNER JOIN task T ON B.task_id = T.id", nativeQuery = true
     )
     fun findUserTasks(userId: Long): ArrayList<Task>
+
+    @Query(
+        "SELECT * from task where task.task_name like %?1%", nativeQuery = true
+    )
+    fun searchAllTask(searchKey: String): ArrayList<Task>
+
+    @Query(
+        "SELECT T.id, T.task_name, T.description, T.reporter, T.priority, T.status, T.logged_time, T.create_date, T.end_date, T.is_deleted" +
+                " FROM user A INNER JOIN user_task B ON B.user_id = :userId And A.id = B.user_id INNER JOIN task T ON B.task_id = T.id where T.task_name like %:searchKey%", nativeQuery = true
+    )
+    fun searchUserTasks(userId: Long, searchKey: String): ArrayList<Task>
+
 }

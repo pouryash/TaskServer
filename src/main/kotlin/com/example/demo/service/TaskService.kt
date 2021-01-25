@@ -8,20 +8,13 @@ import com.example.demo.repository.UserRepo
 import com.example.demo.repository.UserTaskDetailRepo
 import com.example.demo.repository.UserTaskRepo
 import com.example.demo.utils.DateUtils
-import org.hibernate.jpa.QueryHints
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Service
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
 import java.util.*
-import kotlin.collections.ArrayList
 import javax.persistence.EntityManagerFactory
-import javax.persistence.EntityManager
 import javax.persistence.Query
-import org.modelmapper.ModelMapper
-import org.springframework.context.annotation.Bean
 
 
 @Service
@@ -36,12 +29,12 @@ class TaskService(
 
     override fun filterTAsks(filterModel: FilterModel): ResponseEntity<ResponseModel> {
 
-        var dateFilter: String = ""
-        var statusFilter: String = ""
-        var priorityFilter: String = ""
-        var endDateFilter: String = ""
-        var userFilter: String = ""
-        val fildes =
+        var dateFilter = ""
+        var statusFilter = ""
+        var priorityFilter = ""
+        var endDateFilter = ""
+        var userFilter = ""
+        val fields =
             "T.id, T.taskName, T.description, T.reporter, T.priority, T.status, T.loggedTime, T.createDate, T.endDate, U.userName, U.email"
 
         if (filterModel.status != "" && getValidStatus(filterModel.status) != "") {
@@ -63,7 +56,7 @@ class TaskService(
         val em = emf.createEntityManager()
 
         val query: Query = em.createQuery(
-            "SELECT $fildes FROM User U INNER JOIN UserTask B ON U.id = B.userId INNER JOIN Task T ON B.taskId = T.id And T.isDeleted != 1" +
+            "SELECT $fields FROM User U INNER JOIN UserTask B ON U.id = B.userId INNER JOIN Task T ON B.taskId = T.id And T.isDeleted != 1" +
                     " $dateFilter $statusFilter $priorityFilter $endDateFilter $userFilter "
         )
         val list = query.resultList
@@ -179,6 +172,37 @@ class TaskService(
     }
 
 
+    fun searchTask(Authorization: String, taskDto: TaskDto): ResponseEntity<ResponseModel> {
+
+        userRepo.findByToken(Authorization)?.let {
+            if (it.role == "admin")
+                return ResponseEntity(
+                    ResponseModel(
+                        HttpStatus.OK.value(),
+                        HttpStatus.OK.reasonPhrase,
+                        convertTaskListToTaskDtoList(taskRepository.searchAllTask(taskDto.taskName))
+                    ), HttpStatus.OK
+                )
+
+            return ResponseEntity(
+                ResponseModel(
+                    HttpStatus.OK.value(),
+                    HttpStatus.OK.reasonPhrase,
+                    convertTaskListToTaskDtoList(taskRepository.searchUserTasks(it.id , taskDto.taskName))
+                ), HttpStatus.OK
+            )
+        }
+
+        return ResponseEntity(
+            ResponseModel(
+                HttpStatus.NOT_FOUND.value(),
+                "User not found"
+            ), HttpStatus.NOT_FOUND
+        )
+
+    }
+
+
     fun createNewTask(taskDto: TaskDto?): ResponseEntity<ResponseModel> {
 
         taskDto?.let {
@@ -196,16 +220,8 @@ class TaskService(
                     )
 
                 }
-                val validLog = getValidLoggedTime(taskDto.loggedTime, "")
-                if (validLog.isNotEmpty())
-                    taskDto.loggedTime = validLog
-                else
-                    return ResponseEntity(
-                        ResponseModel(
-                            HttpStatus.UNPROCESSABLE_ENTITY.value(),
-                            HttpStatus.UNPROCESSABLE_ENTITY.reasonPhrase
-                        ), HttpStatus.UNPROCESSABLE_ENTITY
-                    )
+
+                taskDto.loggedTime = ""
                 taskDto.status = getValidStatus(taskDto.status)
                 taskDto.priority = getValidPriority(taskDto.priority)
                 taskDto.createDate = DateUtils.convertDateToString(Date())

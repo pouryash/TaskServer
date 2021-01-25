@@ -28,6 +28,12 @@ class TaskController() {
         return taskService.getUserTasksByToken(Authorization)
     }
 
+    @PostMapping("/searchTask")
+    fun searchTask(@RequestHeader Authorization: String, @RequestBody taskDto: TaskDto): ResponseEntity<ResponseModel>{
+
+        return taskService.searchTask(Authorization, taskDto)
+    }
+
     @GetMapping("/getAllTasks")
     fun getAllTasks(@RequestHeader Authorization: String): ResponseEntity<ResponseModel> {
         return taskService.getAllTasks(Authorization)

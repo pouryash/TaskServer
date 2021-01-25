@@ -3,11 +3,9 @@ package com.example.demo.service
 import com.example.demo.Dbmodel.User
 import com.example.demo.model.ResponseModel
 import com.example.demo.model.UserDTO
-import com.example.demo.model.UserToken
 import com.example.demo.repository.UserRepo
 import com.example.demo.utils.DateUtils
 import io.jsonwebtoken.Jwts
-import io.jsonwebtoken.SignatureAlgorithm
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.GrantedAuthority
@@ -15,6 +13,10 @@ import org.springframework.security.core.authority.AuthorityUtils
 import org.springframework.stereotype.Service
 import java.util.*
 import java.util.stream.Collectors
+import io.jsonwebtoken.security.Keys
+
+import io.jsonwebtoken.io.Decoders
+
 
 @Service
 class UserServic(private val userRepository: UserRepo) {
@@ -54,6 +56,7 @@ class UserServic(private val userRepository: UserRepo) {
                 }
 
                 userDTO.token = getJWTToken(userDTO)
+                userDTO.role = "user"
                 userDTO.createDate = DateUtils.convertDateToString(Date())
                 val user = convertUserDtoToUserEntity(userDTO)
 
@@ -64,7 +67,7 @@ class UserServic(private val userRepository: UserRepo) {
                     ResponseModel(
                         HttpStatus.OK.value(),
                         HttpStatus.OK.reasonPhrase,
-                        UserToken(token = user.token, userName = user.userName, role = user.role)
+                        convertUserEntityToUserDto(user)
                     ), HttpStatus.OK
                 )
             }
@@ -81,12 +84,12 @@ class UserServic(private val userRepository: UserRepo) {
 
 
     fun userLogin(userDTO: UserDTO): ResponseEntity<ResponseModel> {
-        userRepository.findByUserNameAndPassword(userDTO.userName, userDTO.password)?.let { user ->
+        userRepository.findByEmailAndPassword(userDTO.email, userDTO.password)?.let { user ->
             return ResponseEntity(
                 ResponseModel(
                     HttpStatus.OK.value(),
                     HttpStatus.OK.reasonPhrase,
-                    UserToken(token = user.token, userName = user.userName, role = user.role)
+                    convertUserEntityToUserDto(user)
                 ), HttpStatus.OK
             )
         }
@@ -114,7 +117,8 @@ class UserServic(private val userRepository: UserRepo) {
                 return ResponseEntity(
                     ResponseModel(
                         HttpStatus.OK.value(),
-                        HttpStatus.OK.reasonPhrase
+                        HttpStatus.OK.reasonPhrase,
+                        convertUserEntityToUserDto(existingUser)
                     ), HttpStatus.OK
                 )
             }
@@ -144,7 +148,7 @@ class UserServic(private val userRepository: UserRepo) {
     fun convertUserEntityToUserDto(user: User): UserDTO {
         return UserDTO(
             id = user.id, userName = user.userName, password = user.password,
-            createDate = user.createDate, role = user.role, email = user.email
+            createDate = user.createDate, role = user.role, email = user.email, token = user.token
         )
     }
 
@@ -163,6 +167,8 @@ class UserServic(private val userRepository: UserRepo) {
 
     fun getJWTToken(userDTO: UserDTO): String {
         val secretKey = "mySecretKeyForJWTUserTaskApplicationthisisfortestinjwtddddddddddddd"
+        val keyBytes = Decoders.BASE64.decode(secretKey)
+
         val grantedAuthorities = AuthorityUtils
             .commaSeparatedStringToAuthorityList("ROLE_USER")
         val token = Jwts
@@ -174,10 +180,7 @@ class UserServic(private val userRepository: UserRepo) {
                     .map { obj: GrantedAuthority -> obj.authority }
                     .collect(Collectors.toList()))
             .setIssuedAt(Date(System.currentTimeMillis()))
-            .signWith(
-                SignatureAlgorithm.HS512,
-                secretKey.toByteArray()
-            ).compact()
+            .signWith(Keys.hmacShaKeyFor(keyBytes)).compact()
         return "Bearer $token"
     }
 }

@@ -30,7 +30,8 @@ internal class WebSecurityConfig : WebSecurityConfigurerAdapter() {
         http.csrf().disable()
             .addFilterAfter(JWTAuthorizationFilter(), UsernamePasswordAuthenticationFilter::class.java)
             .authorizeRequests()
-            .antMatchers(HttpMethod.POST, "/createUsers").permitAll()
+            .antMatchers(HttpMethod.POST, "/api/createUsers", "/api/userLogin")
+            .permitAll()
             .anyRequest().authenticated()
     }
 }
