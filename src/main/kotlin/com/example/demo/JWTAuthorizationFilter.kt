@@ -21,6 +21,7 @@ import io.jsonwebtoken.MalformedJwtException
 import io.jsonwebtoken.UnsupportedJwtException
 
 import io.jsonwebtoken.ExpiredJwtException
+import io.jsonwebtoken.io.Decoders
 import io.jsonwebtoken.io.IOException
 import io.jsonwebtoken.security.SignatureException
 
@@ -71,7 +72,7 @@ class JWTAuthorizationFilter : OncePerRequestFilter() {
 
     private fun validateToken(request: HttpServletRequest): Claims {
         val jwtToken = request.getHeader(HEADER).replace(PREFIX, "")
-        return Jwts.parser().setSigningKey(SECRET.toByteArray()).parseClaimsJws(jwtToken).body
+        return Jwts.parser().setSigningKey(Decoders.BASE64.decode(SECRET)).parseClaimsJws(jwtToken).body
     }
 
     /**

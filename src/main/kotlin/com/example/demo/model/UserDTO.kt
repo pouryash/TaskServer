@@ -9,7 +9,7 @@ data class UserDTO(
     val userName: String = "",
     val password: String = "",
     val email: String = "",
-    val role: String = "user",
+    var role: String = "user",
     var createDate: String = "",
     var token: String = ""
 )
