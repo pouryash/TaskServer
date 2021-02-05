@@ -188,7 +188,7 @@ class TaskService(
                 ResponseModel(
                     HttpStatus.OK.value(),
                     HttpStatus.OK.reasonPhrase,
-                    convertTaskListToTaskDtoList(taskRepository.searchUserTasks(it.id , taskDto.taskName))
+                    convertTaskListToTaskDtoList(taskRepository.searchUserTasks(it.id, taskDto.taskName))
                 ), HttpStatus.OK
             )
         }
@@ -438,41 +438,76 @@ class TaskService(
     }
 
     fun getValidLoggedTime(current: String, previous: String): String {
+        val logFormat = "0w-0d-0h-0m"
+        val formatList = logFormat.split('-')
+
         if (!isLoggedTimeValid(current) || !isLoggedTimeValid(previous))
             return ""
-        val currentList = current.replace(" ", "").split('-')
-        val previousList = previous.replace(" ", "").split('-')
-        var newLoggedTime = ""
-        if (previousList[0].isNotEmpty() && currentList[0].isNotEmpty()) {
-            for (i in currentList.indices) {
-                for (j in previousList.indices) {
-                    if (currentList[i].last() == previousList[j].last()) {
-                        var suffix = currentList[i].filter { it.isLetter() }
-                        var firstNum = currentList[i].filter { it.isDigit() }.toInt()
-                        var secondNum = previousList[j].filter { it.isDigit() }.toInt()
-                        newLoggedTime += "${(firstNum + secondNum)}$suffix-"
-                        break
-                    } else {
-                        if (currentList.size > previousList.size) {
-                            if (j < previousList.size - 1)
-                                continue
-                            newLoggedTime += "${currentList[i]}-"
-                        } else {
-                            if (i == 0)
-                                newLoggedTime += "${previousList[j]}-"
-                            continue
-                        }
-                    }
-                }
 
-            }
-        } else {
-            newLoggedTime = if (currentList[0].isNotEmpty())
-                current.replace(" ", "")
+        var currentList = current.split(" ")
+        var previousList = previous.replace(" ", "").split('-')
+
+        previousList = formatList.map {
+            if (previous.contains(it.last()))
+                previousList.first { data -> data.contains(it.last()) }.toString()
             else
-                previous.replace(" ", "")
+                it
         }
-        return newLoggedTime.removeSuffix("-")
+
+        val resultList = previousList.map {
+            if (current.contains(it.last())) {
+                val suffix = currentList.first { data -> data.contains(it.last()) }.filter { it.isLetter() }
+                val firstNum = currentList.first { data -> data.contains(it.last()) }.filter { it.isDigit() }.toInt()
+                val secondNum = it.filter { it.isDigit() }.toInt()
+                "${(firstNum + secondNum)}$suffix"
+            } else
+                it
+        }
+
+        var result = ""
+
+        resultList.forEach {
+            if (it.first().toString() != "0")
+                result += "$it-"
+        }
+
+        return result.removeSuffix("-")
+
+//        var newLoggedTime = ""
+//        if (previousList[0].isNotEmpty() && currentList[0].isNotEmpty()) {
+//            for (i in currentList.indices) {
+//                for (j in previousList.indices) {
+//                    if (currentList[i].last() == previousList[j].last()) {
+//                        var suffix = currentList[i].filter { it.isLetter() }
+//                        var firstNum = currentList[i].filter { it.isDigit() }.toInt()
+//                        var secondNum = previousList[j].filter { it.isDigit() }.toInt()
+//                        newLoggedTime += "${(firstNum + secondNum)}$suffix-"
+//                        break
+//                    } else {
+//                        if (currentList.size > previousList.size) {
+//                            if (j < previousList.size - 1)
+//                                continue
+//                            newLoggedTime += "${currentList[i]}-"
+//                        } else {
+//                            if (i == 0 && newLoggedTime.isEmpty()) {
+//                                newLoggedTime += "${previousList[j]}-"
+//                                continue
+//                            }
+//                            if (i == currentList.size - 1 && j > currentList.size - 1) {
+//                                newLoggedTime += "${previousList[j]}-"
+//                            }
+//                        }
+//                    }
+//                }
+//
+//            }
+//        } else {
+//            newLoggedTime = if (currentList[0].isNotEmpty())
+//                current.replace(" ", "")
+//            else
+//                previous.replace(" ", "")
+//        }
+//        return newLoggedTime.removeSuffix("-")
     }
 
     fun isLoggedTimeValid(value: String): Boolean {
