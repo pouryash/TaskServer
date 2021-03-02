@@ -35,34 +35,37 @@ class TaskService(
         var endDateFilter = ""
         var userFilter = ""
         val fields =
-            "T.id, T.taskName, T.description, T.reporter, T.priority, T.status, T.loggedTime, T.createDate, T.endDate, U.userName, U.email"
+            "T.id, T.task_name, T.description, T.reporter, T.priority, T.status, T.logged_time, T.create_date, T.end_date, T.is_deleted, U.user_name, U.email"
 
         if (filterModel.status != "" && getValidStatus(filterModel.status) != "") {
-            statusFilter += "And T.status = '${getValidStatus(filterModel.status)}'"
+            var statusResult = ""
+            filterModel.status.split(",").forEach { statusResult += "\'${it.trim()}\', " }
+            statusFilter += "And T.status IN (${statusResult.removeSuffix(", ")})"
         }
         if (filterModel.priority != "" && getValidPriority(filterModel.priority) != "") {
-            priorityFilter += "And T.priority = '${getValidPriority(filterModel.priority)}'"
+            var priorityResult = ""
+            filterModel.priority.split(",").forEach { priorityResult += "\'${it.trim()}\', " }
+            priorityFilter += "And T.priority IN (${priorityResult.removeSuffix(", ")})"
         }
         if (filterModel.fromDate != "" && filterModel.toDate != "") {
-            dateFilter += "And T.createDate between '${filterModel.fromDate}' and '${filterModel.toDate}'"
+            dateFilter += "And T.create_date between '${filterModel.fromDate}' and '${filterModel.toDate}'"
         }
         if (filterModel.isEnded) {
-            endDateFilter += "And T.endDate IS NOT NULL"
+            endDateFilter += "And T.end_date IS NOT NULL"
         }
-        if (filterModel.userId != -1L) {
-            userFilter += "And U.id = '${filterModel.userId}'"
+        if (filterModel.userName != "") {
+            userFilter += "And U.user_name = '${filterModel.userName}'"
         }
-
         val em = emf.createEntityManager()
 
-        val query: Query = em.createQuery(
-            "SELECT $fields FROM User U INNER JOIN UserTask B ON U.id = B.userId INNER JOIN Task T ON B.taskId = T.id And T.isDeleted != 1" +
+        val query: Query = em.createNativeQuery(
+            "SELECT $fields FROM user U INNER JOIN user_task B ON U.id = B.user_id INNER JOIN task T ON B.task_id = T.id And T.is_deleted != 1" +
                     " $dateFilter $statusFilter $priorityFilter $endDateFilter $userFilter "
-        )
+        , Task::class.java)
         val list = query.resultList
         em.close()
 
-        return return ResponseEntity(
+        return ResponseEntity(
             ResponseModel(
                 HttpStatus.OK.value(),
                 HttpStatus.OK.reasonPhrase,
@@ -89,7 +92,7 @@ class TaskService(
                 ResponseModel(
                     HttpStatus.OK.value(),
                     HttpStatus.OK.reasonPhrase,
-                    taskRepository.findUserTasks(it.id)
+                    convertTaskListToTaskDtoList(taskRepository.findUserTasks(it.id))
                 ), HttpStatus.OK
             )
         }
@@ -265,10 +268,10 @@ class TaskService(
                     if (taskDto.status.equals(Status.Done.name, ignoreCase = true))
                         taskDto.endDate = DateUtils.convertDateToString(Date())
                     else
-                        taskDto.endDate = DateUtils.convertDateToString(existingTask.endDate)
+                        taskDto.endDate = ""
 
                     val validLog = getValidLoggedTime(taskDto.loggedTime, existingTask.loggedTime)
-                    if (validLog.isNotEmpty())
+                    if ((validLog.isEmpty() && existingTask.loggedTime.isEmpty()) || validLog.isNotEmpty())
                         taskDto.loggedTime = validLog
                     else
                         return ResponseEntity(
@@ -425,8 +428,8 @@ class TaskService(
             "inprogress" -> {
                 return Status.InProgress.name
             }
-            "testing" -> {
-                return Status.Testing.name
+            "test" -> {
+                return Status.Test.name
             }
             "done" -> {
                 return Status.Done.name

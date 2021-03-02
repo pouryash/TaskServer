@@ -29,4 +29,10 @@ interface TaskRepository : JpaRepository<Task, Long>{
     )
     fun searchUserTasks(userId: Long, searchKey: String): ArrayList<Task>
 
+    @Query(
+        "SELECT T.id, T.task_name, T.description, T.reporter, T.priority, T.status, T.logged_time, T.create_date, T.end_date, U.user_name, U.email" +
+                " FROM user U INNER JOIN user_task B ON U.id = B.user_id INNER JOIN task T ON B.task_id = T.id And T.is_deleted != 1 ?1", nativeQuery = true
+    )
+    fun filterTask(query: String): ArrayList<Task>
+
 }

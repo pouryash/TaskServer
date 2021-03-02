@@ -6,7 +6,7 @@ data class FilterModel(
         var toDate: String = "",
         var status: String = "",
         var priority: String = "",
-        var userId: Long = -1,
+        var userName: String = "",
         var isEnded: Boolean = false
 
 )
